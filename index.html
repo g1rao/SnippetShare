@@ -1,325 +1,230 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SnippetShare - A Simple Snippet Sharing Tool</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <style>
-        body {
-            font-family: 'Inter', sans-serif;
-        }
-        /* Custom scrollbar for a better look in dark mode */
-        textarea::-webkit-scrollbar, .snippet-grid::-webkit-scrollbar {
-            width: 8px;
-        }
-        textarea::-webkit-scrollbar-track, .snippet-grid::-webkit-scrollbar-track {
-            background: #1f2937; /* bg-gray-800 */
-        }
-        textarea::-webkit-scrollbar-thumb, .snippet-grid::-webkit-scrollbar-thumb {
-            background-color: #4b5563; /* bg-gray-600 */
-            border-radius: 4px;
-        }
-        textarea::-webkit-scrollbar-thumb:hover, .snippet-grid::-webkit-scrollbar-thumb:hover {
-            background-color: #6b7280; /* bg-gray-500 */
-        }
-        .fade-in {
-            animation: fadeIn 0.5s ease-in-out;
-        }
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(-10px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-    </style>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>SnippetShare</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+  <style>
+    body { font-family: 'Inter', sans-serif; }
+    pre { white-space: pre-wrap; word-break: break-word; }
+    .muted { color: #9ca3af; }
+  </style>
 </head>
-<body class="bg-gray-900 text-gray-200 min-h-screen p-4">
+<body class="bg-gray-50 text-gray-900 min-h-screen">
+  <div class="max-w-7xl mx-auto p-6">
+    <header class="flex items-center justify-between mb-6">
+      <div>
+        <h1 class="text-2xl font-semibold">SnippetShare</h1>
+        <div class="text-sm muted">by Jeevan Rao</div>
+      </div>
+      <div class="flex gap-3">
+        <button id="new-btn" class="px-3 py-2 bg-blue-600 text-white rounded">New Snippet</button>
+        <button id="refresh-btn" class="px-3 py-2 bg-gray-200 rounded">Refresh</button>
+      </div>
+    </header>
 
-    <div class="w-full max-w-4xl mx-auto">
-        <header class="text-center mb-8">
-            <h1 class="text-4xl md:text-5xl font-bold text-white cursor-pointer" onclick="window.location.href=window.location.pathname">
-                Snippet<span class="text-emerald-400">Share</span>
-            </h1>
-            <p class="text-gray-400 mt-2">Instantly save, share, and collaborate on text snippets.</p>
-             <button id="go-to-new-btn"
-                class="mt-4 inline-flex items-center justify-center px-6 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg shadow-md transition-transform transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-opacity-75">
-                <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path></svg>
-                Create New Snippet
-            </button>
-        </header>
+    <div class="grid grid-cols-1 lg:grid-cols-4 gap-6">
+      <!-- Sidebar -->
+      <aside class="lg:col-span-1 bg-white rounded shadow p-4 h-[72vh] overflow-auto">
+        <input id="search" placeholder="Search snippets..." class="w-full px-3 py-2 rounded border" />
+        <div id="list" class="mt-3 space-y-2"></div>
+        <p id="empty" class="mt-3 text-sm muted hidden">No snippets yet.</p>
+      </aside>
 
-        <!-- Container for switching views -->
-        <div id="app-container">
-            <!-- Snippet Grid View -->
-            <div id="grid-view">
-                <h2 class="text-2xl font-semibold text-white mb-4">Recent Snippets</h2>
-                <div id="snippet-grid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 max-h-[60vh] overflow-y-auto pr-2">
-                    <!-- Snippet tiles will be inserted here -->
-                </div>
-                 <p id="no-snippets-message" class="text-center text-gray-500 py-8 hidden">No snippets found. Why not create one?</p>
-            </div>
-
-            <!-- Editor/Viewer View -->
-            <main id="editor-view" class="bg-gray-800 rounded-lg shadow-2xl p-6 relative hidden">
-                <!-- Main Text Area -->
-                <div class="relative">
-                    <textarea id="snippet-area"
-                        class="w-full h-80 p-4 bg-gray-900 border-2 border-gray-700 rounded-md resize-none focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all duration-300 text-gray-300"
-                        placeholder="Paste your snippet here..."></textarea>
-                </div>
-
-                <!-- Action Buttons -->
-                <div id="action-buttons" class="mt-4 flex flex-col sm:flex-row items-center justify-between gap-4">
-                     <div class="flex gap-2">
-                        <button id="new-btn"
-                            class="hidden items-center justify-center w-full sm:w-auto px-5 py-2.5 bg-sky-600 hover:bg-sky-700 text-white font-semibold rounded-lg shadow-md transition-transform transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-opacity-75">
-                            <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path></svg>
-                            New
-                        </button>
-                        <button id="copy-btn"
-                            class="hidden items-center justify-center w-full sm:w-auto px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-lg shadow-md transition-transform transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-opacity-75">
-                            <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
-                            Copy Snippet
-                        </button>
-                    </div>
-                    <button id="save-btn"
-                        class="flex items-center justify-center w-full sm:w-auto px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg shadow-md transition-transform transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-opacity-75">
-                        <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"></path></svg>
-                        Save & Share
-                    </button>
-                </div>
-
-                <!-- Shareable Link Display -->
-                <div id="share-section" class="hidden mt-6 p-4 bg-gray-900 rounded-lg fade-in">
-                    <label class="block text-sm font-medium text-gray-400 mb-2">Your shareable link is ready:</label>
-                    <div class="flex items-center gap-2">
-                        <input id="share-url" type="text" readonly
-                            class="w-full p-2 bg-gray-700 border border-gray-600 rounded-md text-emerald-400 focus:outline-none">
-                        <button id="copy-url-btn"
-                            class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-lg shadow-md transition-transform transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-indigo-500">
-                            Copy
-                        </button>
-                    </div>
-                </div>
-            </main>
+      <!-- Editor -->
+      <section class="lg:col-span-3 bg-white rounded shadow p-4 flex flex-col" >
+        <div class="flex items-center justify-between mb-3 gap-3">
+          <div class="flex items-center gap-2">
+            <button id="save" class="px-3 py-2 bg-green-600 text-white rounded">Save (Ctrl/Cmd+S)</button>
+            <button id="delete" class="px-3 py-2 bg-red-600 text-white rounded">Delete</button>
+            <button id="copy" class="px-3 py-2 bg-gray-200 rounded">Copy</button>
+            <button id="preview" class="px-3 py-2 bg-indigo-600 text-white rounded">Preview</button>
+            <label class="ml-4 flex items-center gap-2 muted">
+              <input id="autosave" type="checkbox" /> Autosave
+            </label>
+          </div>
+          <div class="text-sm muted">ID: <span id="sid">—</span></div>
         </div>
-        <!-- Universal Loader -->
-        <div id="loader" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50">
-            <div class="animate-spin rounded-full h-16 w-16 border-b-2 border-emerald-400"></div>
+
+        <textarea id="editor" class="flex-1 border rounded p-3 text-sm" placeholder="Type your snippet here..." ></textarea>
+
+        <div class="mt-3 flex items-center justify-between">
+          <div id="status" class="text-sm muted">Ready</div>
+          <div class="text-sm muted">Last saved: <span id="last-saved">—</span></div>
         </div>
-        <!-- Notification Area -->
-        <div id="notification" class="hidden fixed top-6 right-6 p-3 rounded-lg text-white font-medium shadow-lg transition-all duration-300 z-50">
-        </div>
+      </section>
     </div>
 
-    <script type="module">
-        // Replaced Firebase logic with REST API calls to Flask backend
-        const snippetArea = document.getElementById('snippet-area');
-        const saveBtn = document.getElementById('save-btn');
-        const newBtn = document.getElementById('new-btn');
-        const copyBtn = document.getElementById('copy-btn');
-        const shareSection = document.getElementById('share-section');
-        const shareUrlInput = document.getElementById('share-url');
-        const copyUrlBtn = document.getElementById('copy-url-btn');
-        const notification = document.getElementById('notification');
-        const loader = document.getElementById('loader');
-        const editorView = document.getElementById('editor-view');
-        const gridView = document.getElementById('grid-view');
-        const snippetGrid = document.getElementById('snippet-grid');
-        const goToNewBtn = document.getElementById('go-to-new-btn');
-        const noSnippetsMessage = document.getElementById('no-snippets-message');
+    <!-- Preview modal -->
+    <div id="modal" class="fixed inset-0 bg-black bg-opacity-40 hidden items-center justify-center">
+      <div class="bg-white rounded p-4 w-11/12 max-w-3xl">
+        <div class="flex justify-between items-center mb-2">
+          <h3 class="font-semibold">Preview</h3>
+          <button id="close-modal" class="px-2 py-1 bg-gray-200 rounded">Close</button>
+        </div>
+        <pre id="preview-content" class="bg-gray-100 p-3 rounded max-h-[60vh] overflow-auto"></pre>
+      </div>
+    </div>
+  </div>
 
-        const API_BASE = '/api/snippets';
+  <script type="module">
+    const API = '/api/snippets';
+    const listEl = document.getElementById('list');
+    const editor = document.getElementById('editor');
+    const search = document.getElementById('search');
+    const saveBtn = document.getElementById('save');
+    const newBtn = document.getElementById('new-btn');
+    const refreshBtn = document.getElementById('refresh-btn');
+    const sidEl = document.getElementById('sid');
+    const status = document.getElementById('status');
+    const lastSaved = document.getElementById('last-saved');
+    const autosave = document.getElementById('autosave');
+    const copyBtn = document.getElementById('copy');
+    const previewBtn = document.getElementById('preview');
+    const modal = document.getElementById('modal');
+    const closeModal = document.getElementById('close-modal');
+    const previewContent = document.getElementById('preview-content');
+    const deleteBtn = document.getElementById('delete');
+    const empty = document.getElementById('empty');
 
-        const showLoader = (show) => loader.classList.toggle('hidden', !show);
+    let snippets = [];
+    let currentId = null;
+    let autosaveInterval = null;
 
-        const showNotification = (message, type = 'success') => {
-            notification.textContent = message;
-            notification.classList.remove('hidden', 'bg-emerald-500', 'bg-red-500', 'bg-sky-500');
-            if (type === 'success') notification.classList.add('bg-emerald-500');
-            else if (type === 'error') notification.classList.add('bg-red-500');
-            else notification.classList.add('bg-sky-500');
-            notification.classList.add('fade-in');
-            setTimeout(() => notification.classList.add('hidden'), 3000);
-        };
+    function toast(t){ status.textContent = t; setTimeout(()=>status.textContent='Ready', 2500); }
 
-        const setViewingMode = (isViewing) => {
-            snippetArea.readOnly = isViewing;
-            saveBtn.classList.toggle('hidden', isViewing);
-            newBtn.classList.toggle('hidden', !isViewing);
-            copyBtn.classList.toggle('hidden', !isViewing);
-            if (!isViewing) shareSection.classList.add('hidden');
-        };
+    async function loadAll(){
+      try {
+        const res = await fetch(API);
+        snippets = await res.json();
+        renderList(snippets);
+      } catch (e){ console.error(e); toast('Load failed'); }
+    }
 
-        const switchView = (view) => {
-            if (view === 'editor') {
-                gridView.classList.add('hidden');
-                editorView.classList.remove('hidden');
-                goToNewBtn.textContent = 'Back to Snippets';
-                goToNewBtn.classList.remove('bg-emerald-600', 'hover:bg-emerald-700');
-                goToNewBtn.classList.add('bg-gray-600', 'hover:bg-gray-700');
-            } else {
-                editorView.classList.add('hidden');
-                gridView.classList.remove('hidden');
-                goToNewBtn.innerHTML = `<svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path></svg> Create New Snippet`;
-                goToNewBtn.classList.add('bg-emerald-600', 'hover:bg-emerald-700');
-                goToNewBtn.classList.remove('bg-gray-600', 'hover:bg-gray-700');
-            }
-        };
+    function renderList(items){
+      listEl.innerHTML = '';
+      if (!items.length){ empty.classList.remove('hidden'); return; } else empty.classList.add('hidden');
+      items.forEach(s=>{
+        const btn = document.createElement('button');
+        btn.className = 'w-full text-left p-2 rounded hover:bg-gray-50';
+        btn.innerHTML = `<div class="font-medium">${escapeHtml((s.content||'').split('\n')[0].slice(0,80))}</div><div class="text-xs muted">${new Date(s.created_at).toLocaleString()}</div>`;
+        btn.addEventListener('click', ()=> loadOne(s.id));
+        listEl.appendChild(btn);
+      });
+    }
 
-        const loadAllSnippets = async () => {
-            showLoader(true);
-            snippetGrid.innerHTML = '';
-            try {
-                const res = await fetch(API_BASE, { method: 'GET' });
-                if (!res.ok) throw new Error('Failed to load snippets');
-                const snippets = await res.json();
-                if (!snippets.length) {
-                    noSnippetsMessage.classList.remove('hidden');
-                } else {
-                    noSnippetsMessage.classList.add('hidden');
-                }
-                snippets.forEach(s => {
-                    const tile = document.createElement('a');
-                    tile.href = `?id=${s.id}`;
-                    tile.className = 'block p-4 bg-gray-800 rounded-lg shadow-lg hover:bg-gray-700 transition-colors duration-200';
-                    const contentPreview = (s.content || '').substring(0, 200) + ((s.content || '').length > 200 ? '...' : '');
-                    tile.innerHTML = `<pre class="text-sm text-gray-400 whitespace-pre-wrap font-sans">${contentPreview}</pre>`;
-                    snippetGrid.appendChild(tile);
-                });
-            } catch (err) {
-                console.error(err);
-                showNotification('Could not load snippets.', 'error');
-            } finally {
-                showLoader(false);
-            }
-        };
+    function escapeHtml(s){ return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
-        const loadSnippet = async (id) => {
-            showLoader(true);
-            try {
-                const res = await fetch(`${API_BASE}/${encodeURIComponent(id)}`, { method: 'GET' });
-                if (res.status === 404) {
-                    showNotification('Snippet not found.', 'error');
-                    setViewingMode(false);
-                    snippetArea.value = `#404\n\nSorry, we couldn't find a snippet with the ID: ${id}`;
-                    snippetArea.readOnly = true;
-                } else if (!res.ok) {
-                    throw new Error('Failed to load snippet');
-                } else {
-                    const snippet = await res.json();
-                    snippetArea.value = snippet.content || '';
-                    setViewingMode(true);
-                }
-            } catch (err) {
-                console.error(err);
-                showNotification('Error loading snippet.', 'error');
-                setViewingMode(false);
-            } finally {
-                showLoader(false);
-            }
-        };
+    async function loadOne(id){
+      try {
+        const r = await fetch(`${API}/${encodeURIComponent(id)}`);
+        if (r.status===404){ toast('Not found'); return; }
+        const s = await r.json();
+        editor.value = s.content || '';
+        currentId = s.id;
+        sidEl.textContent = s.id;
+        lastSaved.textContent = new Date(s.created_at).toLocaleString();
+        window.history.replaceState({}, '', `?id=${s.id}`);
+      } catch (e){ console.error(e); toast('Load failed'); }
+    }
 
-        const saveSnippet = async () => {
-            const content = snippetArea.value.trim();
-            if (!content) {
-                showNotification('Snippet cannot be empty!', 'error');
-                return;
-            }
-            showLoader(true);
-            saveBtn.disabled = true;
-            try {
-                const res = await fetch(API_BASE, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ content })
-                });
-                if (!res.ok) throw new Error('Save failed');
-                const data = await res.json();
-                const newId = data.id;
-                const newUrl = `${window.location.origin}${window.location.pathname}?id=${newId}`;
-                window.history.pushState({ path: newUrl }, '', newUrl);
-                shareUrlInput.value = newUrl;
-                shareSection.classList.remove('hidden');
-                setViewingMode(true);
-                showNotification('Snippet saved successfully!', 'success');
-            } catch (err) {
-                console.error(err);
-                showNotification('Could not save snippet. Please try again.', 'error');
-            } finally {
-                showLoader(false);
-                saveBtn.disabled = false;
-            }
-        };
+    async function save(){
+      const content = editor.value.trim();
+      if (!content) { toast('Empty not saved'); return; }
+      saveBtn.disabled = true;
+      try {
+        let res;
+        if (currentId) {
+          res = await fetch(`${API}/${encodeURIComponent(currentId)}`, {
+            method: 'PUT',
+            headers: {'Content-Type':'application/json'},
+            body: JSON.stringify({ content })
+          });
+        } else {
+          res = await fetch(API, {
+            method: 'POST',
+            headers: {'Content-Type':'application/json'},
+            body: JSON.stringify({ content })
+          });
+        }
+        if (!res.ok) throw new Error('save failed');
+        const data = await res.json();
+        currentId = data.id ?? currentId;
+        sidEl.textContent = currentId;
+        lastSaved.textContent = new Date().toLocaleString();
+        toast('Saved');
+        await loadAll();
+        window.history.replaceState({}, '', `?id=${currentId}`);
+      } catch (e){ console.error(e); toast('Save failed'); } finally { saveBtn.disabled=false; }
+    }
 
-        // Event listeners
-        saveBtn.addEventListener('click', saveSnippet);
+    saveBtn.addEventListener('click', save);
+    refreshBtn.addEventListener('click', loadAll);
+    newBtn.addEventListener('click', ()=>{ currentId = null; sidEl.textContent='—'; editor.value=''; lastSaved.textContent='—'; window.history.replaceState({}, '', window.location.pathname); });
 
-        newBtn.addEventListener('click', () => {
-            snippetArea.value = '';
-            setViewingMode(false);
-            window.history.pushState({ path: window.location.pathname }, '', window.location.pathname);
-        });
+    // Delete
+    deleteBtn.addEventListener('click', async ()=>{
+      if (!currentId) return toast('No snippet selected');
+      if (!confirm('Delete this snippet?')) return;
+      try {
+        const r = await fetch(`${API}/${encodeURIComponent(currentId)}`, { method: 'DELETE' });
+        if (r.status === 204) {
+          toast('Deleted');
+          currentId = null;
+          sidEl.textContent='—';
+          editor.value='';
+          await loadAll();
+          window.history.replaceState({}, '', window.location.pathname);
+        } else toast('Delete failed');
+      } catch (e){ console.error(e); toast('Delete failed'); }
+    });
 
-        goToNewBtn.addEventListener('click', () => {
-            if (editorView.classList.contains('hidden')) {
-                snippetArea.value = '';
-                setViewingMode(false);
-                window.history.pushState({ path: window.location.pathname }, '', window.location.pathname);
-                switchView('editor');
-            } else {
-                window.history.pushState({ path: window.location.pathname }, '', window.location.pathname);
-                initApp();
-            }
-        });
+    // Search
+    search.addEventListener('input', ()=> {
+      const q = search.value.toLowerCase();
+      renderList(snippets.filter(s=> (s.content||'').toLowerCase().includes(q)));
+    });
 
-        copyBtn.addEventListener('click', () => {
-            snippetArea.select();
-            try {
-                document.execCommand('copy');
-                showNotification('Snippet copied to clipboard!', 'success');
-            } catch (err) {
-                navigator.clipboard.writeText(snippetArea.value)
-                    .then(() => showNotification('Snippet copied to clipboard!', 'success'))
-                    .catch(e => {
-                        showNotification('Failed to copy snippet.', 'error');
-                        console.error('Copy failed:', e);
-                    });
-            }
-        });
+    // Copy
+    copyBtn.addEventListener('click', async ()=>{
+      try { await navigator.clipboard.writeText(editor.value); toast('Copied'); } catch(e){ toast('Copy failed'); }
+    });
 
-        copyUrlBtn.addEventListener('click', () => {
-            shareUrlInput.select();
-            try {
-                document.execCommand('copy');
-                showNotification('Share link copied!', 'success');
-            } catch (err) {
-                navigator.clipboard.writeText(shareUrlInput.value)
-                    .then(() => showNotification('Share link copied!', 'success'))
-                    .catch(e => {
-                        showNotification('Failed to copy link.', 'error');
-                        console.error('Copy failed:', e);
-                    });
-            }
-        });
+    // Preview
+    previewBtn.addEventListener('click', ()=> {
+      previewContent.textContent = editor.value;
+      modal.classList.remove('hidden');
+      modal.style.display='flex';
+    });
+    closeModal.addEventListener('click', ()=> { modal.classList.add('hidden'); modal.style.display='none'; });
 
-        // App entry
-        const initApp = async () => {
-            const urlParams = new URLSearchParams(window.location.search);
-            const snippetId = urlParams.get('id');
-            if (snippetId) {
-                await loadSnippet(snippetId);
-                switchView('editor');
-            } else {
-                await loadAllSnippets();
-                switchView('grid');
-            }
-        };
+    // Keyboard shortcut
+    window.addEventListener('keydown', (e)=> {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') { e.preventDefault(); save(); }
+      if (e.key === 'Escape') { editor.value=''; toast('Cleared'); }
+    });
 
-        document.addEventListener('DOMContentLoaded', () => {
-            initApp().catch(err => console.error(err));
-        });
-    </script>
+    // Autosave
+    autosave.addEventListener('change', ()=> {
+      if (autosave.checked) {
+        autosaveInterval = setInterval(()=>{ if (editor.value.trim()) save(); }, 8000);
+        toast('Autosave on (8s)');
+      } else {
+        clearInterval(autosaveInterval);
+        autosaveInterval = null;
+        toast('Autosave off');
+      }
+    });
+
+    // Init: load all, optionally open ?id=
+    (async function init(){
+      await loadAll();
+      const p = new URLSearchParams(window.location.search);
+      const id = p.get('id');
+      if (id) await loadOne(id);
+    })();
+  </script>
 </body>
 </html>
-

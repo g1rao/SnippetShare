@@ -80,6 +80,30 @@ def create_snippet():
     new_snippet_id = cursor.lastrowid
     return jsonify({'id': new_snippet_id, 'message': 'Snippet created successfully'}), 201
 
+@app.route('/api/snippets/<int:snippet_id>', methods=['PUT'])
+def update_snippet(snippet_id):
+    """Updates an existing snippet's content."""
+    if not request.json or 'content' not in request.json:
+        return jsonify({'error': 'Missing content'}), 400
+    content = request.json['content']
+    db = get_db()
+    cursor = db.execute('UPDATE snippets SET content = ? WHERE id = ?', (content, snippet_id))
+    db.commit()
+    if cursor.rowcount == 0:
+        return jsonify({'error': 'Snippet not found'}), 404
+    updated = db.execute('SELECT id, content, created_at FROM snippets WHERE id = ?', (snippet_id,)).fetchone()
+    return jsonify(dict(updated)), 200
+
+@app.route('/api/snippets/<int:snippet_id>', methods=['DELETE'])
+def delete_snippet(snippet_id):
+    """Deletes a snippet."""
+    db = get_db()
+    cursor = db.execute('DELETE FROM snippets WHERE id = ?', (snippet_id,))
+    db.commit()
+    if cursor.rowcount == 0:
+        return jsonify({'error': 'Snippet not found'}), 404
+    return '', 204
+
 # --- Frontend Serving ---
 
 @app.route('/')
