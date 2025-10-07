@@ -14,23 +14,6 @@ Author / Copyright: Jeevan Rao
 
 ---
 
-## Screenshots
-
-Place screenshots in the `screenshots/` folder with these names:
-
-- screenshots/home.png — Snippet list / grid
-- screenshots/editor.png — Editor / save & share flow
-- screenshots/share.png — Example share link view
-
-Example markdown (will render once images are added):
-
-![Home view](screenshots/home.png)
-![Editor view](screenshots/editor.png)
-![Share link](screenshots/share.png)
-
-Recommendation: 1200×800 or similar; optimized PNG or compressed JPG.
-
----
 
 ## Local development (macOS)
 
