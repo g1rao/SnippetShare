@@ -122,6 +122,54 @@
       overflow:auto;
     }
 
+    /* Modal (preview popup) - make scrollable when content is tall */
+    .modal-backdrop{
+      position:fixed;
+      inset:0;
+      background:rgba(2,6,23,0.6);
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      z-index:80;
+      padding:20px;              /* allow space when viewport is small */
+      box-sizing:border-box;
+      overflow:auto;             /* allow page-level scroll if modal taller than viewport */
+    }
+
+    .modal{
+      width:calc(100% - 48px);
+      max-width:900px;
+      background:linear-gradient(180deg,var(--panel),rgba(11,22,34,0.6));
+      border:1px solid var(--border);
+      box-shadow:0 20px 60px rgba(2,6,23,0.7);
+      border-radius:12px;
+      padding:18px;
+      display:flex;
+      flex-direction:column;
+      gap:12px;
+      max-height: calc(100vh - 48px); /* constrain modal height */
+      overflow: hidden;               /* keep header/actions fixed inside modal */
+    }
+
+    /* modal body holds the scrollable preview */
+    .modal-body{
+      overflow:auto;
+      max-height: calc(100vh - 220px); /* leave room for header/actions and padding */
+      -webkit-overflow-scrolling: touch;
+    }
+
+    /* ensure preview region inside modal is scrollable */
+    .preview{
+      background:linear-gradient(180deg,rgba(255,255,255,0.01),transparent);
+      padding:.85rem;
+      border-radius:.6rem;
+      border:1px solid rgba(255,255,255,0.03);
+      min-height:200px;
+      overflow:auto;
+      max-height: calc(100vh - 260px);
+      box-sizing:border-box;
+    }
+
     /* Modal (preview popup) */
     .modal-backdrop{position:fixed;inset:0;background:rgba(2,6,23,0.6);display:flex;align-items:center;justify-content:center;z-index:80}
     .modal{width:calc(100% - 48px);max-width:900px;background:linear-gradient(180deg,var(--panel),rgba(11,22,34,0.6));border:1px solid var(--border);box-shadow:0 20px 60px rgba(2,6,23,0.7);border-radius:12px;padding:18px;display:flex;flex-direction:column;gap:12px}
@@ -171,13 +219,13 @@
         <div class="flex items-start justify-between gap-3">
           <div class="flex items-center gap-2">
             <button id="save" class="btn btn-primary">Save <span class="muted ml-2" style="font-size:11px">(Ctrl/Cmd+S)</span></button>
-            <button id="copy" class="btn-copy" aria-live="polite" aria-label="Copy snippet to clipboard">
+            <button id="copy" class="btn btn-copy" style="color:rgb(164, 230, 164)" aria-live="polite" aria-label="Copy snippet to clipboard">
               <span id="copy-icon" class="btn-icon" aria-hidden="true">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6M9 16h6M8 7h8a1 1 0 011 1v9a1 1 0 01-1 1H8a1 1 0 01-1-1V8a1 1 0 011-1z"/></svg>
               </span>
-              <span id="copy-label" style="font-weight:600;color:var(--muted)">Copy</span>
+              <span id="copy-label" style="font-weight:600;color:rgb(164, 230, 164)">Copy</span>
             </button>
-            <button id="preview-toggle" class="btn btn-ghost">Preview</button>
+            <button id="preview-toggle" class="btn btn-ghost" style="color:rgb(129, 129, 202)">Preview</button>
             <button id="delete" class="btn btn-danger">Delete</button>
             <label class="ml-3 muted flex items-center gap-2"><input id="autosave" type="checkbox" /> Autosave</label>
           </div>
@@ -224,11 +272,11 @@
           </div>
           <div class="modal-actions">
             <button id="preview-save" class="btn btn-primary">Save</button>
-            <button id="preview-copy" class="btn-copy">Copy</button>
-            <button id="preview-close" class="btn btn-ghost">Close</button>
+            <button id="preview-copy" class="btn btn-copy" style="color:rgb(164, 230, 164)">Copy</button>
+            <button id="preview-close" class="btn btn-ghost" style="color:red">Close</button>
           </div>
         </div>
-        <div id="preview-content" class="preview" style="margin-top:6px"></div>
+        <div id="preview-content" class="preview modal-body" style="margin-top:6px" tabindex="0"></div>
       </div>
     </div>
   </div>
@@ -381,6 +429,10 @@
       previewId.textContent = `ID: ${currentId || '—'}`;
       previewBackdrop.style.display = 'flex';
       previewBackdrop.parentElement.classList.remove('hidden');
+
+      // ensure preview area is scrolled to top and receives focus so scrolling works immediately
+      previewContent.scrollTop = 0;
+      previewContent.focus();
     });
     previewClose.addEventListener('click', ()=>{
       previewBackdrop.style.display = 'none';
