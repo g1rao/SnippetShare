@@ -5,226 +5,424 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>SnippetShare</title>
   <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
   <style>
-    body { font-family: 'Inter', sans-serif; }
-    pre { white-space: pre-wrap; word-break: break-word; }
-    .muted { color: #9ca3af; }
+    /* Enterprise Dark — Navy theme (single theme only) */
+    :root{
+      --bg:#06101a;
+      --panel:#0b1622;
+      --muted:#8fa0ae;
+      --text:#e7f0f6;
+      --primary:#1f6feb;
+      --primary-600:#155fcc;
+      --accent:#0ea5a4;
+      --success:#10b981;
+      --danger:#ef4444;
+      --glass:rgba(255,255,255,0.02);
+      --border:rgba(255,255,255,0.04);
+      --focus:rgba(31,110,235,0.16);
+      --radius:10px;
+    }
+
+    html,body{height:100%}
+    body{
+      margin:0;
+      font-family:Inter,system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial;
+      background:linear-gradient(180deg,var(--bg),#041018);
+      color:var(--text);
+      -webkit-font-smoothing:antialiased;
+      -moz-osx-font-smoothing:grayscale;
+    }
+
+    /* Card */
+    .panel{
+      background:linear-gradient(180deg,var(--panel), rgba(11,22,34,0.6));
+      border:1px solid var(--border);
+      box-shadow:0 10px 30px rgba(2,6,23,0.6);
+      border-radius:var(--radius);
+      padding:0.75rem;
+      height:100%;
+    }
+
+    /* ensure sidebar and main are same height */
+    .layout-grid > * { min-height:72vh; display:flex; flex-direction:column; }
+
+    /* Buttons: tighter spacing */
+    .btn{
+      display:inline-flex;
+      align-items:center;
+      gap:.36rem;            /* reduced gap */
+      padding:.42rem .75rem; /* tighter */
+      border-radius:.5rem;
+      font-weight:600;
+      cursor:pointer;
+      border:0;
+      line-height:1;
+    }
+    .btn:focus{outline:none;box-shadow:0 0 0 4px var(--focus)}
+    .btn-primary{background:linear-gradient(180deg,var(--primary),var(--primary-600));color:white;box-shadow:0 8px 24px rgba(31,110,235,0.10)}
+    .btn-ghost{background:transparent;border:1px solid var(--border);color:var(--muted)}
+    .btn-danger{background:linear-gradient(180deg,#da3f3f,#b83232);color:white}
+    .btn-copy{background:var(--glass);border:1px solid var(--border);color:var(--muted);padding:.36rem .6rem;display:inline-flex;align-items:center;gap:.4rem}
+    .btn-copy:hover{background:linear-gradient(180deg,rgba(255,255,255,0.01),transparent);color:var(--text)}
+    .btn-copy.copied{background:linear-gradient(180deg,rgba(16,185,129,0.12),rgba(16,185,129,0.06));color:var(--success);box-shadow:0 12px 36px rgba(16,185,129,0.06)}
+    .btn-icon{width:1.05rem;height:1.05rem;display:inline-flex;align-items:center;justify-content:center}
+
+    /* List items + hover accent - full width clickable */
+    .snippet-item{
+      display:block;
+      width:100%;
+      padding:.75rem;
+      border-radius:.6rem;
+      transition:transform .12s,background .12s,box-shadow .12s,border-left .12s;
+      text-align:left;
+      border-left:4px solid transparent;
+      background:transparent;
+      cursor:pointer;
+      box-sizing:border-box;
+      border:0;
+    }
+    .snippet-item .title{
+      font-weight:700;
+      color:var(--primary); /* colorful title */
+      display:block;
+      width:100%;
+      overflow:hidden;
+      text-overflow:ellipsis;
+      white-space:nowrap;
+    }
+    .snippet-item .meta{font-size:.8rem;color:var(--muted);margin-top:6px}
+    .snippet-item:hover,.snippet-item:focus{
+      background:linear-gradient(90deg,rgba(255,255,255,0.02),rgba(255,255,255,0.01));
+      transform:translateX(6px);
+      box-shadow:0 10px 30px rgba(2,6,23,0.45);
+      border-left-color:var(--accent);
+    }
+
+    /* Editor + preview — editor spans full column */
+    .editor{
+      width:100%;
+      min-height:420px;
+      padding:.85rem;
+      border-radius:.6rem;
+      background:transparent;
+      border:1px solid rgba(255,255,255,0.03);
+      color:var(--text);
+      font-family:ui-monospace, SFMono-Regular, Menlo, monospace;
+      resize:vertical;
+      box-sizing:border-box;
+    }
+    .preview{
+      background:linear-gradient(180deg,rgba(255,255,255,0.01),transparent);
+      padding:.85rem;
+      border-radius:.6rem;
+      border:1px solid rgba(255,255,255,0.03);
+      min-height:200px;
+      overflow:auto;
+    }
+
+    /* Modal (preview popup) */
+    .modal-backdrop{position:fixed;inset:0;background:rgba(2,6,23,0.6);display:flex;align-items:center;justify-content:center;z-index:80}
+    .modal{width:calc(100% - 48px);max-width:900px;background:linear-gradient(180deg,var(--panel),rgba(11,22,34,0.6));border:1px solid var(--border);box-shadow:0 20px 60px rgba(2,6,23,0.7);border-radius:12px;padding:18px;display:flex;flex-direction:column;gap:12px}
+    .modal-header{display:flex;justify-content:space-between;align-items:center;gap:12px}
+    .modal-actions{display:flex;gap:8px;align-items:center}
+
+    /* Toasts */
+    #toast-container{position:fixed;top:1rem;right:1rem;display:flex;flex-direction:column;gap:.5rem;z-index:90;pointer-events:none}
+    .toast{pointer-events:auto;display:flex;gap:.75rem;align-items:center;padding:.5rem .85rem;border-radius:.6rem;background:linear-gradient(180deg,rgba(255,255,255,0.02),rgba(255,255,255,0.01));color:var(--text);border:1px solid var(--border);box-shadow:0 12px 36px rgba(2,6,23,0.6);transform:translateY(6px);opacity:0;transition:transform .18s,opacity .18s}
+    .toast.show{transform:translateY(0);opacity:1}
+    .toast__icon{width:1.4rem;text-align:center;font-weight:700}
+    .toast--success{border-left:4px solid var(--success);background:linear-gradient(90deg,rgba(16,185,129,0.06),rgba(255,255,255,0.01));color:#052f20}
+    .toast--error{border-left:4px solid var(--danger);background:linear-gradient(90deg,rgba(239,68,68,0.06),rgba(255,255,255,0.01));color:#3b0a0a}
+    .toast--info{border-left:4px solid var(--accent);background:linear-gradient(90deg,rgba(14,165,164,0.04),rgba(255,255,255,0.01));color:#042f31}
+
+    /* responsive layout (single column for editor + preview stacked) */
+    @media (min-width:1024px){ .layout-grid{display:grid;grid-template-columns:320px 1fr;gap:1rem} }
   </style>
 </head>
-<body class="bg-gray-50 text-gray-900 min-h-screen">
+<body class="min-h-screen">
   <div class="max-w-7xl mx-auto p-6">
     <header class="flex items-center justify-between mb-6">
       <div>
-        <h1 class="text-2xl font-semibold">SnippetShare</h1>
+        <h1 class="text-2xl font-semibold" style="background:linear-gradient(90deg,var(--primary),#7c3aed);-webkit-background-clip:text;background-clip:text;color:transparent">SnippetShare</h1>
         <div class="text-sm muted">by Jeevan Rao</div>
       </div>
-      <div class="flex gap-3">
-        <button id="new-btn" class="px-3 py-2 bg-blue-600 text-white rounded">New Snippet</button>
-        <button id="refresh-btn" class="px-3 py-2 bg-gray-200 rounded">Refresh</button>
+
+      <div class="flex items-center gap-3">
+        <button id="new-btn" class="btn btn-primary">New</button>
+        <button id="refresh-btn" class="btn btn-ghost">Refresh</button>
       </div>
     </header>
 
-    <div class="grid grid-cols-1 lg:grid-cols-4 gap-6">
-      <!-- Sidebar -->
-      <aside class="lg:col-span-1 bg-white rounded shadow p-4 h-[72vh] overflow-auto">
-        <input id="search" placeholder="Search snippets..." class="w-full px-3 py-2 rounded border" />
-        <div id="list" class="mt-3 space-y-2"></div>
-        <p id="empty" class="mt-3 text-sm muted hidden">No snippets yet.</p>
+    <div class="layout-grid">
+      <aside class="panel p-4 overflow-auto">
+        <div class="mb-3">
+          <input id="search" class="w-full px-3 py-2 rounded border bg-transparent" placeholder="Search (Ctrl/Cmd+K)" />
+        </div>
+
+        <div id="list" class="space-y-2 flex-1 overflow-auto"></div>
+        <p id="empty" class="mt-3 text-sm muted hidden">No snippets yet. Click New to create one.</p>
       </aside>
 
-      <!-- Editor -->
-      <section class="lg:col-span-3 bg-white rounded shadow p-4 flex flex-col" >
-        <div class="flex items-center justify-between mb-3 gap-3">
+      <main class="panel p-4 flex flex-col gap-3">
+        <div class="flex items-start justify-between gap-3">
           <div class="flex items-center gap-2">
-            <button id="save" class="px-3 py-2 bg-green-600 text-white rounded">Save (Ctrl/Cmd+S)</button>
-            <button id="delete" class="px-3 py-2 bg-red-600 text-white rounded">Delete</button>
-            <button id="copy" class="px-3 py-2 bg-gray-200 rounded">Copy</button>
-            <button id="preview" class="px-3 py-2 bg-indigo-600 text-white rounded">Preview</button>
-            <label class="ml-4 flex items-center gap-2 muted">
-              <input id="autosave" type="checkbox" /> Autosave
-            </label>
+            <button id="save" class="btn btn-primary">Save <span class="muted ml-2" style="font-size:11px">(Ctrl/Cmd+S)</span></button>
+            <button id="copy" class="btn-copy" aria-live="polite" aria-label="Copy snippet to clipboard">
+              <span id="copy-icon" class="btn-icon" aria-hidden="true">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6M9 16h6M8 7h8a1 1 0 011 1v9a1 1 0 01-1 1H8a1 1 0 01-1-1V8a1 1 0 011-1z"/></svg>
+              </span>
+              <span id="copy-label" style="font-weight:600;color:var(--muted)">Copy</span>
+            </button>
+            <button id="preview-toggle" class="btn btn-ghost">Preview</button>
+            <button id="delete" class="btn btn-danger">Delete</button>
+            <label class="ml-3 muted flex items-center gap-2"><input id="autosave" type="checkbox" /> Autosave</label>
           </div>
-          <div class="text-sm muted">ID: <span id="sid">—</span></div>
+
+          <div class="text-sm muted text-right">
+            ID: <span id="sid">—</span><br/><span id="charcount" class="muted">0 chars</span>
+          </div>
         </div>
 
-        <textarea id="editor" class="flex-1 border rounded p-3 text-sm" placeholder="Type your snippet here..." ></textarea>
-
-        <div class="mt-3 flex items-center justify-between">
-          <div id="status" class="text-sm muted">Ready</div>
-          <div class="text-sm muted">Last saved: <span id="last-saved">—</span></div>
+        <!-- Editor spans full width in its column; preview moved to popup -->
+        <div class="grid gap-4" style="flex:1;display:flex;flex-direction:column;">
+          <textarea id="editor" class="editor" placeholder="Type your snippet here..." spellcheck="false"></textarea>
         </div>
-      </section>
+
+        <div class="flex items-center justify-between">
+          <div class="muted text-sm" id="status">Ready</div>
+          <div class="muted text-sm">Last saved: <span id="last-saved">—</span></div>
+        </div>
+      </main>
     </div>
+  </div>
 
-    <!-- Preview modal -->
-    <div id="modal" class="fixed inset-0 bg-black bg-opacity-40 hidden items-center justify-center">
-      <div class="bg-white rounded p-4 w-11/12 max-w-3xl">
-        <div class="flex justify-between items-center mb-2">
-          <h3 class="font-semibold">Preview</h3>
-          <button id="close-modal" class="px-2 py-1 bg-gray-200 rounded">Close</button>
-        </div>
-        <pre id="preview-content" class="bg-gray-100 p-3 rounded max-h-[60vh] overflow-auto"></pre>
+  <!-- Delete confirm modal -->
+  <div id="confirm-modal" class="fixed inset-0 hidden items-center justify-center z-50" aria-modal="true" role="dialog">
+    <div class="bg-black/40 absolute inset-0"></div>
+    <div class="panel z-60 w-full max-w-lg p-6">
+      <h3 class="text-lg font-semibold">Delete snippet?</h3>
+      <p class="muted mt-2">This action cannot be undone.</p>
+      <div class="mt-4 flex justify-end gap-3">
+        <button id="cancel-delete" class="btn btn-ghost">Cancel</button>
+        <button id="confirm-delete" class="btn btn-danger">Delete</button>
       </div>
     </div>
   </div>
+
+  <!-- Preview modal -->
+  <div id="preview-modal" class="hidden">
+    <div class="modal-backdrop" id="preview-backdrop" style="display:none">
+      <div class="modal" role="dialog" aria-modal="true" aria-label="Preview snippet">
+        <div class="modal-header">
+          <div style="display:flex;flex-direction:column">
+            <div style="font-weight:700;font-size:1.05rem;color:var(--primary)">Preview</div>
+            <div class="muted" id="preview-id">ID: —</div>
+          </div>
+          <div class="modal-actions">
+            <button id="preview-save" class="btn btn-primary">Save</button>
+            <button id="preview-copy" class="btn-copy">Copy</button>
+            <button id="preview-close" class="btn btn-ghost">Close</button>
+          </div>
+        </div>
+        <div id="preview-content" class="preview" style="margin-top:6px"></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast-container" aria-live="polite" aria-atomic="true"></div>
 
   <script type="module">
     const API = '/api/snippets';
     const listEl = document.getElementById('list');
     const editor = document.getElementById('editor');
+    const previewToggle = document.getElementById('preview-toggle');
     const search = document.getElementById('search');
     const saveBtn = document.getElementById('save');
-    const newBtn = document.getElementById('new-btn');
-    const refreshBtn = document.getElementById('refresh-btn');
+    const copyBtn = document.getElementById('copy');
+    const copyLabel = document.getElementById('copy-label');
+    const copyIcon = document.getElementById('copy-icon');
+    const deleteBtn = document.getElementById('delete');
+    const confirmModal = document.getElementById('confirm-modal');
+    const cancelDelete = document.getElementById('cancel-delete');
+    const confirmDelete = document.getElementById('confirm-delete');
     const sidEl = document.getElementById('sid');
     const status = document.getElementById('status');
     const lastSaved = document.getElementById('last-saved');
-    const autosave = document.getElementById('autosave');
-    const copyBtn = document.getElementById('copy');
-    const previewBtn = document.getElementById('preview');
-    const modal = document.getElementById('modal');
-    const closeModal = document.getElementById('close-modal');
+    const autosaveEl = document.getElementById('autosave');
+    const charcount = document.getElementById('charcount');
+    const newBtn = document.getElementById('new-btn');
+    const refreshBtn = document.getElementById('refresh-btn');
+
+    // preview modal elements
+    const previewBackdrop = document.getElementById('preview-backdrop');
     const previewContent = document.getElementById('preview-content');
-    const deleteBtn = document.getElementById('delete');
-    const empty = document.getElementById('empty');
+    const previewId = document.getElementById('preview-id');
+    const previewSave = document.getElementById('preview-save');
+    const previewCopy = document.getElementById('preview-copy');
+    const previewClose = document.getElementById('preview-close');
 
-    let snippets = [];
-    let currentId = null;
-    let autosaveInterval = null;
+    let snippets = [], currentId = null, autosaveTimer = null, undoStack = [];
 
-    function toast(t){ status.textContent = t; setTimeout(()=>status.textContent='Ready', 2500); }
-
-    async function loadAll(){
-      try {
-        const res = await fetch(API);
-        snippets = await res.json();
-        renderList(snippets);
-      } catch (e){ console.error(e); toast('Load failed'); }
+    function toast(message, type='info', duration=3000){
+      const container = document.getElementById('toast-container'); if(!container) return;
+      const t = document.createElement('div'); t.className = 'toast toast--' + type; t.setAttribute('role','status');
+      const icon = document.createElement('div'); icon.className = 'toast__icon'; icon.textContent = type==='success'?'✓':(type==='error'?'⚠':'ℹ');
+      const txt = document.createElement('div'); txt.textContent = message;
+      t.appendChild(icon); t.appendChild(txt); container.appendChild(t);
+      requestAnimationFrame(()=> t.classList.add('show'));
+      const remove = ()=>{ t.classList.remove('show'); setTimeout(()=> t.remove(),220); };
+      t.addEventListener('click', remove);
+      setTimeout(remove, duration);
     }
+
+    function escapeHtml(s){ return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
     function renderList(items){
       listEl.innerHTML = '';
-      if (!items.length){ empty.classList.remove('hidden'); return; } else empty.classList.add('hidden');
+      if(!items.length){ document.getElementById('empty').classList.remove('hidden'); return; }
+      document.getElementById('empty').classList.add('hidden');
       items.forEach(s=>{
         const btn = document.createElement('button');
-        btn.className = 'w-full text-left p-2 rounded hover:bg-gray-50';
-        btn.innerHTML = `<div class="font-medium">${escapeHtml((s.content||'').split('\n')[0].slice(0,80))}</div><div class="text-xs muted">${new Date(s.created_at).toLocaleString()}</div>`;
-        btn.addEventListener('click', ()=> loadOne(s.id));
+        btn.type='button';
+        btn.className='snippet-item';
+        btn.innerHTML = `<div class="title snippet-title">${escapeHtml((s.content||'').split('\n')[0].slice(0,120))}</div><div class="meta snippet-meta">${new Date(s.created_at).toLocaleString()}</div>`;
+        btn.onclick = ()=> loadOne(s.id);
         listEl.appendChild(btn);
       });
     }
 
-    function escapeHtml(s){ return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+    async function loadAll(){
+      try{
+        const res = await fetch(API);
+        snippets = await res.json();
+        renderList(snippets);
+      }catch(e){ console.error(e); toast('Failed to load snippets','error'); }
+    }
 
     async function loadOne(id){
-      try {
-        const r = await fetch(`${API}/${encodeURIComponent(id)}`);
-        if (r.status===404){ toast('Not found'); return; }
-        const s = await r.json();
+      try{
+        const res = await fetch(`${API}/${encodeURIComponent(id)}`);
+        if(res.status===404){ /* no notification required */ return; }
+        const s = await res.json();
+        pushUndo();
         editor.value = s.content || '';
-        currentId = s.id;
-        sidEl.textContent = s.id;
+        updateCharCount();
+        currentId = s.id; sidEl.textContent = s.id;
         lastSaved.textContent = new Date(s.created_at).toLocaleString();
-        window.history.replaceState({}, '', `?id=${s.id}`);
-      } catch (e){ console.error(e); toast('Load failed'); }
+        history.replaceState({},'',`?id=${s.id}`);
+      }catch(e){ console.error(e); toast('Failed to load','error'); }
     }
 
     async function save(){
-      const content = editor.value.trim();
-      if (!content) { toast('Empty not saved'); return; }
+      const content = editor.value;
+      if(!content.trim()){ toast('Cannot save empty snippet','info'); return; }
       saveBtn.disabled = true;
-      try {
+      try{
         let res;
-        if (currentId) {
+        if(currentId){
           res = await fetch(`${API}/${encodeURIComponent(currentId)}`, {
-            method: 'PUT',
-            headers: {'Content-Type':'application/json'},
-            body: JSON.stringify({ content })
+            method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({content})
           });
         } else {
-          res = await fetch(API, {
-            method: 'POST',
-            headers: {'Content-Type':'application/json'},
-            body: JSON.stringify({ content })
-          });
+          res = await fetch(API, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({content}) });
         }
-        if (!res.ok) throw new Error('save failed');
+        if(!res.ok) throw new Error('save failed');
         const data = await res.json();
-        currentId = data.id ?? currentId;
+        currentId = data.id || currentId;
         sidEl.textContent = currentId;
         lastSaved.textContent = new Date().toLocaleString();
-        toast('Saved');
+        toast('Saved','success',1200);
         await loadAll();
-        window.history.replaceState({}, '', `?id=${currentId}`);
-      } catch (e){ console.error(e); toast('Save failed'); } finally { saveBtn.disabled=false; }
+        history.replaceState({},'',`?id=${currentId}`);
+      }catch(e){ console.error(e); toast('Save failed','error',2500); }
+      finally{ saveBtn.disabled=false; }
     }
 
-    saveBtn.addEventListener('click', save);
-    refreshBtn.addEventListener('click', loadAll);
-    newBtn.addEventListener('click', ()=>{ currentId = null; sidEl.textContent='—'; editor.value=''; lastSaved.textContent='—'; window.history.replaceState({}, '', window.location.pathname); });
-
-    // Delete
-    deleteBtn.addEventListener('click', async ()=>{
-      if (!currentId) return toast('No snippet selected');
-      if (!confirm('Delete this snippet?')) return;
-      try {
-        const r = await fetch(`${API}/${encodeURIComponent(currentId)}`, { method: 'DELETE' });
-        if (r.status === 204) {
-          toast('Deleted');
-          currentId = null;
-          sidEl.textContent='—';
-          editor.value='';
-          await loadAll();
-          window.history.replaceState({}, '', window.location.pathname);
-        } else toast('Delete failed');
-      } catch (e){ console.error(e); toast('Delete failed'); }
+    deleteBtn.addEventListener('click', ()=>{
+      if(!currentId){ toast('No snippet selected','info'); return; }
+      confirmModal.classList.remove('hidden'); confirmModal.style.display='flex';
+    });
+    cancelDelete.addEventListener('click', ()=>{ confirmModal.classList.add('hidden'); confirmModal.style.display='none'; });
+    confirmDelete.addEventListener('click', async ()=>{
+      try{
+        const r = await fetch(`${API}/${encodeURIComponent(currentId)}`, { method:'DELETE' });
+        if(r.status===204){ toast('Deleted','success'); currentId = null; sidEl.textContent='—'; editor.value=''; lastSaved.textContent='—'; await loadAll(); history.replaceState({},'',location.pathname); }
+        else toast('Delete failed','error');
+      }catch(e){ console.error(e); toast('Delete failed','error'); }
+      confirmModal.classList.add('hidden'); confirmModal.style.display='none';
     });
 
-    // Search
-    search.addEventListener('input', ()=> {
-      const q = search.value.toLowerCase();
-      renderList(snippets.filter(s=> (s.content||'').toLowerCase().includes(q)));
-    });
-
-    // Copy
+    // Copy handler (no toast, still visual button state)
     copyBtn.addEventListener('click', async ()=>{
-      try { await navigator.clipboard.writeText(editor.value); toast('Copied'); } catch(e){ toast('Copy failed'); }
-    });
-
-    // Preview
-    previewBtn.addEventListener('click', ()=> {
-      previewContent.textContent = editor.value;
-      modal.classList.remove('hidden');
-      modal.style.display='flex';
-    });
-    closeModal.addEventListener('click', ()=> { modal.classList.add('hidden'); modal.style.display='none'; });
-
-    // Keyboard shortcut
-    window.addEventListener('keydown', (e)=> {
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') { e.preventDefault(); save(); }
-      if (e.key === 'Escape') { editor.value=''; toast('Cleared'); }
-    });
-
-    // Autosave
-    autosave.addEventListener('change', ()=> {
-      if (autosave.checked) {
-        autosaveInterval = setInterval(()=>{ if (editor.value.trim()) save(); }, 8000);
-        toast('Autosave on (8s)');
-      } else {
-        clearInterval(autosaveInterval);
-        autosaveInterval = null;
-        toast('Autosave off');
+      const text = editor.value || '';
+      if(!text.trim()){ /* no toast */ return; }
+      const setCopied = ()=>{
+        copyBtn.classList.add('copied'); copyLabel.textContent='Copied'; copyIcon.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>';
+        copyBtn.animate([{transform:'scale(1)'},{transform:'scale(1.02)'},{transform:'scale(1)'}],{duration:600});
+      };
+      const reset = ()=>{ copyBtn.classList.remove('copied'); copyLabel.textContent='Copy'; copyIcon.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6M9 16h6M8 7h8a1 1 0 011 1v9a1 1 0 01-1 1H8a1 1 0 01-1-1V8a1 1 0 011-1z"/></svg>`; };
+      try{
+        await navigator.clipboard.writeText(text);
+        setCopied();
+      }catch(e){
+        try{ editor.select(); document.execCommand('copy'); setCopied(); } catch(err){ console.error(err); return; }
       }
+      setTimeout(reset, 2500);
     });
 
-    // Init: load all, optionally open ?id=
-    (async function init(){
-      await loadAll();
-      const p = new URLSearchParams(window.location.search);
-      const id = p.get('id');
-      if (id) await loadOne(id);
-    })();
+    // Preview popup (modal) - shows rendered markdown and exposes copy/save while open
+    previewToggle.addEventListener('click', ()=>{
+      // populate and show modal
+      previewContent.innerHTML = marked.parse(editor.value || '');
+      previewId.textContent = `ID: ${currentId || '—'}`;
+      previewBackdrop.style.display = 'flex';
+      previewBackdrop.parentElement.classList.remove('hidden');
+    });
+    previewClose.addEventListener('click', ()=>{
+      previewBackdrop.style.display = 'none';
+      previewBackdrop.parentElement.classList.add('hidden');
+    });
+
+    previewCopy.addEventListener('click', async ()=>{
+      const text = editor.value || '';
+      if(!text.trim()) return;
+      try{ await navigator.clipboard.writeText(text); previewCopy.classList.add('copied'); setTimeout(()=> previewCopy.classList.remove('copied'), 1800); } catch(e){ try{ editor.select(); document.execCommand('copy'); previewCopy.classList.add('copied'); setTimeout(()=> previewCopy.classList.remove('copied'), 1800);} catch(err){ console.error(err); } }
+    });
+
+    previewSave.addEventListener('click', async ()=>{
+      await save();
+      // update preview content after save
+      previewContent.innerHTML = marked.parse(editor.value || '');
+    });
+
+    function updateCharCount(){ charcount.textContent = `${editor.value.length} chars`; }
+    function pushUndo(){ undoStack.push(editor.value); if(undoStack.length>50) undoStack.shift(); }
+
+    window.addEventListener('keydown', (e)=>{
+      if((e.ctrlKey||e.metaKey) && e.key.toLowerCase()==='s'){ e.preventDefault(); save(); }
+      if((e.ctrlKey||e.metaKey) && e.key.toLowerCase()==='z'){ e.preventDefault(); const prev = undoStack.pop(); if(prev!==undefined){ editor.value = prev; updateCharCount(); /* minimal feedback only */ } }
+      if(e.key==='Escape'){ editor.value=''; updateCharCount(); }
+      if((e.ctrlKey||e.metaKey) && e.key.toLowerCase()==='k'){ e.preventDefault(); search.focus(); search.select(); }
+    });
+
+    autosaveEl.addEventListener('change', ()=>{
+      if(autosaveEl.checked){ autosaveTimer = setInterval(()=>{ if(editor.value.trim()) save(); }, 7000); }
+      else{ clearInterval(autosaveTimer); autosaveTimer=null; }
+    });
+
+    let livePreviewTimer = null;
+    editor.addEventListener('input', ()=>{
+      updateCharCount(); pushUndo();
+    });
+
+    search.addEventListener('input', ()=>{ const q = search.value.toLowerCase(); renderList(snippets.filter(s=> (s.content||'').toLowerCase().includes(q))); });
+
+    newBtn.addEventListener('click', ()=>{ currentId=null; sidEl.textContent='—'; editor.value=''; lastSaved.textContent='—'; updateCharCount(); history.replaceState({},'',location.pathname); });
+    refreshBtn.addEventListener('click', ()=> loadAll());
+
+    (async function init(){ await loadAll(); const p = new URLSearchParams(location.search); const id = p.get('id'); if(id) loadOne(id); updateCharCount(); })();
   </script>
 </body>
 </html>
