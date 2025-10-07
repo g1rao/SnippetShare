@@ -316,6 +316,7 @@
     let snippets = [], currentId = null, autosaveTimer = null, undoStack = [];
 
     function toast(message, type='info', duration=3000){
+      // keep toast for errors only; non-essential notifications removed by design
       const container = document.getElementById('toast-container'); if(!container) return;
       const t = document.createElement('div'); t.className = 'toast toast--' + type; t.setAttribute('role','status');
       const icon = document.createElement('div'); icon.className = 'toast__icon'; icon.textContent = type==='success'?'✓':(type==='error'?'⚠':'ℹ');
@@ -337,6 +338,8 @@
         const btn = document.createElement('button');
         btn.type='button';
         btn.className='snippet-item';
+        // store id on element for quick reference if needed
+        btn.dataset.id = s.id;
         btn.innerHTML = `<div class="title snippet-title">${escapeHtml((s.content||'').split('\n')[0].slice(0,120))}</div><div class="meta snippet-meta">${new Date(s.created_at).toLocaleString()}</div>`;
         btn.onclick = ()=> loadOne(s.id);
         listEl.appendChild(btn);
@@ -354,7 +357,7 @@
     async function loadOne(id){
       try{
         const res = await fetch(`${API}/${encodeURIComponent(id)}`);
-        if(res.status===404){ /* no notification required */ return; }
+        if(res.status===404){ return; }
         const s = await res.json();
         pushUndo();
         editor.value = s.content || '';
@@ -362,12 +365,29 @@
         currentId = s.id; sidEl.textContent = s.id;
         lastSaved.textContent = new Date(s.created_at).toLocaleString();
         history.replaceState({},'',`?id=${s.id}`);
+        setDirtyUI(false); // mark as not dirty initially
       }catch(e){ console.error(e); toast('Failed to load','error'); }
     }
 
+    // Save button UI helpers (no global "saved" toast)
+    function setSavedUI(){
+      saveBtn.classList.add('saved');
+      // keep the small label and show check icon
+      saveBtn.innerHTML = `<svg style="height:14px;width:14px;vertical-align:middle;margin-right:6px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4L19 7"/></svg>Saved`;
+    }
+    function setDirtyUI(markDirty = true){
+      saveBtn.classList.remove('saved');
+      saveBtn.innerHTML = 'Save <span class="muted ml-2" style="font-size:11px">(Ctrl/Cmd+S)</span>';
+      if(markDirty && saveBtn.classList.contains('saved')) {
+        // ensure visible change if was saved
+        saveBtn.classList.remove('saved');
+      }
+    }
+
+    // Save (create or update) — toggles Save button instead of toasting
     async function save(){
       const content = editor.value;
-      if(!content.trim()){ toast('Cannot save empty snippet','info'); return; }
+      if(!content.trim()){ /* no toast for empty save */ return; }
       saveBtn.disabled = true;
       try{
         let res;
@@ -383,31 +403,55 @@
         currentId = data.id || currentId;
         sidEl.textContent = currentId;
         lastSaved.textContent = new Date().toLocaleString();
-        toast('Saved','success',1200);
+
+        // mark saved visually (no toast)
+        setSavedUI();
+
+        // refresh list quietly
         await loadAll();
         history.replaceState({},'',`?id=${currentId}`);
       }catch(e){ console.error(e); toast('Save failed','error',2500); }
       finally{ saveBtn.disabled=false; }
     }
 
+    // Delete modal helpers
+    function openConfirmModal(){ confirmModal.classList.remove('hidden'); confirmModal.style.display='flex'; }
+    function closeConfirmModal(){ confirmModal.classList.add('hidden'); confirmModal.style.display='none'; }
+
     deleteBtn.addEventListener('click', ()=>{
-      if(!currentId){ toast('No snippet selected','info'); return; }
-      confirmModal.classList.remove('hidden'); confirmModal.style.display='flex';
+      if(!currentId){ /* no toast */ return; }
+      openConfirmModal();
     });
-    cancelDelete.addEventListener('click', ()=>{ confirmModal.classList.add('hidden'); confirmModal.style.display='none'; });
+    cancelDelete.addEventListener('click', ()=>{ closeConfirmModal(); });
+
+    // clicking backdrop on confirm modal should close it
+    confirmModal.addEventListener('click', (e)=>{
+      if(e.target === confirmModal || e.target.classList.contains('bg-black/40')) closeConfirmModal();
+    });
+
     confirmDelete.addEventListener('click', async ()=>{
       try{
         const r = await fetch(`${API}/${encodeURIComponent(currentId)}`, { method:'DELETE' });
-        if(r.status===204){ toast('Deleted','success'); currentId = null; sidEl.textContent='—'; editor.value=''; lastSaved.textContent='—'; await loadAll(); history.replaceState({},'',location.pathname); }
-        else toast('Delete failed','error');
+        if(r.ok || r.status===204){
+          // clear selection and refresh list quietly
+          currentId = null;
+          sidEl.textContent='—';
+          editor.value='';
+          lastSaved.textContent='—';
+          updateCharCount();
+          await loadAll();
+          history.replaceState({},'',location.pathname);
+        } else {
+          toast('Delete failed','error');
+        }
       }catch(e){ console.error(e); toast('Delete failed','error'); }
-      confirmModal.classList.add('hidden'); confirmModal.style.display='none';
+      closeConfirmModal();
     });
 
-    // Copy handler (no toast, still visual button state)
+    // Copy handler - visual state only (no toast)
     copyBtn.addEventListener('click', async ()=>{
       const text = editor.value || '';
-      if(!text.trim()){ /* no toast */ return; }
+      if(!text.trim()){ return; }
       const setCopied = ()=>{
         copyBtn.classList.add('copied'); copyLabel.textContent='Copied'; copyIcon.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>';
         copyBtn.animate([{transform:'scale(1)'},{transform:'scale(1.02)'},{transform:'scale(1)'}],{duration:600});
@@ -422,21 +466,26 @@
       setTimeout(reset, 2500);
     });
 
-    // Preview popup (modal) - shows rendered markdown and exposes copy/save while open
-    previewToggle.addEventListener('click', ()=>{
-      // populate and show modal
+    // Preview modal helpers
+    function openPreviewModal(){
       previewContent.innerHTML = marked.parse(editor.value || '');
       previewId.textContent = `ID: ${currentId || '—'}`;
       previewBackdrop.style.display = 'flex';
       previewBackdrop.parentElement.classList.remove('hidden');
-
-      // ensure preview area is scrolled to top and receives focus so scrolling works immediately
       previewContent.scrollTop = 0;
       previewContent.focus();
-    });
-    previewClose.addEventListener('click', ()=>{
+    }
+    function closePreviewModal(){
       previewBackdrop.style.display = 'none';
       previewBackdrop.parentElement.classList.add('hidden');
+    }
+
+    previewToggle.addEventListener('click', ()=> openPreviewModal());
+    previewClose.addEventListener('click', ()=> closePreviewModal());
+
+    // clicking backdrop closes preview (but not modal inner clicks)
+    previewBackdrop.addEventListener('click', (e)=>{
+      if(e.target === previewBackdrop) closePreviewModal();
     });
 
     previewCopy.addEventListener('click', async ()=>{
@@ -455,9 +504,18 @@
     function pushUndo(){ undoStack.push(editor.value); if(undoStack.length>50) undoStack.shift(); }
 
     window.addEventListener('keydown', (e)=>{
+      // prioritize modal dismissal
+      if(e.key === 'Escape'){
+        // if preview open -> close it
+        if(previewBackdrop && previewBackdrop.style.display === 'flex'){ closePreviewModal(); e.preventDefault(); return; }
+        // if confirm modal open -> close it
+        if(confirmModal && confirmModal.style.display === 'flex'){ closeConfirmModal(); e.preventDefault(); return; }
+        // otherwise keep previous behavior: clear editor
+        editor.value=''; updateCharCount(); return;
+      }
+
       if((e.ctrlKey||e.metaKey) && e.key.toLowerCase()==='s'){ e.preventDefault(); save(); }
-      if((e.ctrlKey||e.metaKey) && e.key.toLowerCase()==='z'){ e.preventDefault(); const prev = undoStack.pop(); if(prev!==undefined){ editor.value = prev; updateCharCount(); /* minimal feedback only */ } }
-      if(e.key==='Escape'){ editor.value=''; updateCharCount(); }
+      if((e.ctrlKey||e.metaKey) && e.key.toLowerCase()==='z'){ e.preventDefault(); const prev = undoStack.pop(); if(prev!==undefined){ editor.value = prev; updateCharCount(); } }
       if((e.ctrlKey||e.metaKey) && e.key.toLowerCase()==='k'){ e.preventDefault(); search.focus(); search.select(); }
     });
 
@@ -469,14 +527,38 @@
     let livePreviewTimer = null;
     editor.addEventListener('input', ()=>{
       updateCharCount(); pushUndo();
+      // mark Save as dirty when user types
+      setDirtyUI(true);
     });
 
     search.addEventListener('input', ()=>{ const q = search.value.toLowerCase(); renderList(snippets.filter(s=> (s.content||'').toLowerCase().includes(q))); });
 
-    newBtn.addEventListener('click', ()=>{ currentId=null; sidEl.textContent='—'; editor.value=''; lastSaved.textContent='—'; updateCharCount(); history.replaceState({},'',location.pathname); });
+    newBtn.addEventListener('click', ()=>{ currentId=null; sidEl.textContent='—'; editor.value=''; lastSaved.textContent='—'; updateCharCount(); history.replaceState({},'',location.pathname); setDirtyUI(true); });
     refreshBtn.addEventListener('click', ()=> loadAll());
 
-    (async function init(){ await loadAll(); const p = new URLSearchParams(location.search); const id = p.get('id'); if(id) loadOne(id); updateCharCount(); })();
+    // initialize
+    (async function init(){ await loadAll(); const p = new URLSearchParams(location.search); const id = p.get('id'); if(id) loadOne(id); updateCharCount(); setDirtyUI(false); })();
+
+    // wire Save button click to save()
+    saveBtn.addEventListener('click', save);
+
+    // Replace confirm-modal click handler with robust "click outside to close"
+    // remove old handler if present and add improved one
+    confirmModal.addEventListener('click', (e) => {
+      // if clicked outside the inner panel (i.e. anywhere on the overlay), close
+      if (!e.target.closest('.panel')) {
+        closeConfirmModal();
+      }
+    });
+
+    // Ensure Escape also closes confirm modal (already handled in keydown) but make consistent
+    window.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        if (previewBackdrop && previewBackdrop.style.display === 'flex') { closePreviewModal(); e.preventDefault(); return; }
+        if (confirmModal && confirmModal.style.display === 'flex') { closeConfirmModal(); e.preventDefault(); return; }
+        editor.value = ''; updateCharCount(); return;
+      }
+    });
   </script>
 </body>
 </html>
